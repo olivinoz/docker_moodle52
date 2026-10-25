@@ -1,0 +1,86 @@
+#!/bin/bash
+# =============================================================================
+# Plantilla entrypoint.sh.example
+# =============================================================================
+# Copia este archivo a entrypoint.sh y dale permisos de ejecución:
+#   cp entrypoint.sh.example entrypoint.sh
+#   chmod +x entrypoint.sh
+#
+# Sustituye o ajusta los parámetros de instalación según tu entorno.
+# =============================================================================
+
+set -e
+
+echo "============================================"
+echo ">>> Iniciando entrypoint de Moodle 5.2..."
+echo "============================================"
+
+# Asegurar permisos en moodledata
+chown -R www-data:www-data ${MOODLE_DATA_DIR}
+chmod -R 0770 ${MOODLE_DATA_DIR}
+
+# Determinar URL base (se toma de MOODLE_WWWROOT o fallback a localhost:8080)
+MOODLE_WWWROOT="${MOODLE_WWWROOT:-http://localhost:8080}"
+
+# Parámetros descriptivos del sitio (Personalizar según tu institución)
+MOODLE_SITE_FULLNAME="${MOODLE_SITE_FULLNAME:-Tu Academia o Institucion}"
+MOODLE_SITE_SHORTNAME="${MOODLE_SITE_SHORTNAME:-MiAcademia}"
+
+# Verifica si la instalación ya se realizó
+if [ ! -f "/var/www/html/config.php" ]; then
+    echo ">>> config.php NO encontrado. Iniciando instalación..."
+    
+    # Mostrar variables para debug
+    echo "=== CONFIGURACIÓN DE INSTALACIÓN ==="
+    echo "DB_HOST: ${MOODLE_DATABASE_HOST}"
+    echo "DB_NAME: ${MOODLE_DATABASE_NAME}"
+    echo "DB_USER: ${MOODLE_DATABASE_USER}"
+    echo "DB_TYPE: ${MOODLE_DATABASE_TYPE}"
+    echo "ADMIN_USER: ${MOODLE_USERNAME}"
+    echo "WWWROOT: ${MOODLE_WWWROOT}"
+    echo "FULLNAME: ${MOODLE_SITE_FULLNAME}"
+    echo "SHORTNAME: ${MOODLE_SITE_SHORTNAME}"
+    echo "====================================="
+
+    # Ejecutamos la instalación de manera síncrona (bloqueando Apache hasta terminar)
+    su www-data -s /bin/sh -c "/usr/local/bin/php -d max_execution_time=600 -d memory_limit=512M /var/www/html/admin/cli/install.php \
+        --lang=en \
+        --adminuser=\"${MOODLE_USERNAME}\" \
+        --adminpass=\"${MOODLE_PASSWORD}\" \
+        --adminemail=\"${MOODLE_ADMIN_EMAIL}\" \
+        --fullname=\"${MOODLE_SITE_FULLNAME}\" \
+        --shortname=\"${MOODLE_SITE_SHORTNAME}\" \
+        --dbtype=${MOODLE_DATABASE_TYPE} \
+        --dbhost=\"${MOODLE_DATABASE_HOST}\" \
+        --dbname=\"${MOODLE_DATABASE_NAME}\" \
+        --dbuser=\"${MOODLE_DATABASE_USER}\" \
+        --dbpass=\"${MOODLE_DATABASE_PASSWORD}\" \
+        --dbport=5432 \
+        --prefix=mdl_ \
+        --dataroot=\"${MOODLE_DATA_DIR}\" \
+        --wwwroot=\"${MOODLE_WWWROOT}\" \
+        --non-interactive \
+        --agree-license"
+    
+    # Revisamos si el comando anterior fue exitoso
+    if [ $? -eq 0 ]; then
+        echo ">>> ✅ Instalación completada exitosamente"
+        chown www-data:www-data /var/www/html/config.php
+        chmod 644 /var/www/html/config.php
+    else
+        echo ">>> ❌ ERROR en la instalación. Deteniendo contenedor."
+        exit 1
+    fi
+else
+    echo ">>> config.php ya existe. Saltando instalación."
+fi
+
+# Configurar la API REST (según GUIA API REST GRADE.md)
+echo ">>> Ejecutando configuración automática de API REST..."
+su www-data -s /bin/sh -c "/usr/local/bin/php /usr/local/bin/setup_api_rest.php"
+
+# Asegurar permisos finales
+chown -R www-data:www-data /var/www/html ${MOODLE_DATA_DIR}
+
+echo ">>> Iniciando Apache..."
+exec "$@"

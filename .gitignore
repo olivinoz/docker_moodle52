@@ -1,0 +1,51 @@
+# =========================================================================
+# .gitignore - Protección de Entorno y Datos Sensibles
+# =========================================================================
+
+# --- 1. Variables de Entorno, Credenciales y Secretos ---
+.env
+.env.*
+!.env.example
+*.env
+
+# --- 2. Scripts con lógica interna sensible o de ejecución ---
+*.sh
+entrypoint.sh
+!entrypoint.sh.example
+
+# --- 3. Dumps, Backups y Archivos de Base de Datos ---
+*.sql
+*.sql.gz
+*.dump
+*.tar
+*.bak
+_back_*/
+backup*/
+
+# --- 4. Directorios de Datos Persistentes y Archivos de Moodle ---
+moodledata/
+moodle_data/
+pg_data/
+postgres_data/
+
+# --- 5. Logs y Archivos Temporales ---
+*.log
+logs/
+*.pid
+*.seed
+*.tmp
+*.temp
+
+# --- 6. Archivos del Sistema Operativo e IDEs ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

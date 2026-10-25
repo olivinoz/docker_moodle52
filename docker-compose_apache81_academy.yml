@@ -1,0 +1,74 @@
+# --- Archivo de Orquestación de Docker para el Entorno de Producción de Moodle ---
+services:
+  # --- Servicio de Base de Datos: PostgreSQL ---
+  postgres:
+    # PostgreSQL 15 es perfectamente compatible con Moodle 5.x
+    image: postgres:16-alpine
+    container_name: moodle-postgres-galoc52
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Servicio de Aplicación: Moodle ---
+  moodle:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # CAMBIO: Actualizado a php83 para no causar confusión, Moodle 5.2 requiere PHP 8.3+
+    container_name: moodle-container-galoc52
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      # --- Configuración de Conexión a la Base de Datos ---
+      MOODLE_DATABASE_TYPE: pgsql
+      MOODLE_DATABASE_HOST: postgres
+      MOODLE_DATABASE_PORT_NUMBER: 5432
+      MOODLE_DATABASE_NAME: ${POSTGRES_DB}
+      MOODLE_DATABASE_USER: ${POSTGRES_USER}
+      MOODLE_DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+
+      # --- Configuración del Sitio ---
+      MOODLE_DATA_DIR: /var/moodledata
+      MOODLE_WEB_PORT_EXTERNAL: 8080
+      MOODLE_WWWROOT: ${MOODLE_WWWROOT:-http://localhost:8080}
+      MOODLE_USERNAME: ${MOODLE_USERNAME}
+      MOODLE_PASSWORD: ${MOODLE_PASSWORD}
+      MOODLE_ADMIN_EMAIL: ${MOODLE_ADMIN_EMAIL}
+
+      # --- Variables para API REST Preconfigurada ---
+      MOODLE_API_BOT_USERNAME: ${MOODLE_API_BOT_USERNAME}
+      MOODLE_API_BOT_PASSWORD: ${MOODLE_API_BOT_PASSWORD}
+      MOODLE_API_BOT_EMAIL: ${MOODLE_API_BOT_EMAIL}
+      MOODLE_API_SERVICE_NAME: ${MOODLE_API_SERVICE_NAME}
+      MOODLE_API_SERVICE_SHORTNAME: ${MOODLE_API_SERVICE_SHORTNAME}
+      MOODLE_API_TOKEN: ${MOODLE_API_TOKEN}
+
+      # --- Variables para Usuario Demo ---
+      DEMO_USER_FIRSTNAME: ${DEMO_USER_FIRSTNAME}
+      DEMO_USER_LASTNAME: ${DEMO_USER_LASTNAME}
+      DEMO_USER_COUNTRY: ${DEMO_USER_COUNTRY}
+      DEMO_USER_EMAIL: ${DEMO_USER_EMAIL}
+      DEMO_USER_USERNAME: ${DEMO_USER_USERNAME}
+      DEMO_USER_PASSWORD: ${DEMO_USER_PASSWORD}
+
+    volumes:
+      - "moodle_data:/var/moodledata"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pg_data:
+    driver: local
+  moodle_data:
+    driver: local
